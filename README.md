@@ -1,2 +1,10 @@
 # Caso-1-Merkadit
-Repositiorio para el primer caso de base de datos
+
+## TECNOLÓGICO DE COSTA RICA
+
+### Estudiantes  
+- Lindsay Nahome Marín Sánchez – 2024163904
+- Lee Sangcheol
+
+### Profesor 
+- Rodrigo Nuñez Nuñez
