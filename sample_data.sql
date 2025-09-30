@@ -443,6 +443,25 @@ INSERT INTO MovementTypes (movementTypeID, name) VALUES
 (4, 'RETURN');
 
 -- =====================================================
+-- 22. LOGS TYPES, LEVELS, SOURCES
+-- =====================================================
+
+INSERT INTO LogLevels (logLevelID, name) VALUES 
+(1, 'INFO'),
+(2, 'WARN'),
+(3, 'ERROR'),
+(4, 'DEBUG');
+
+INSERT INTO LogTypes (logTypeID, name) VALUES 
+(1, 'SALES'),
+(2, 'SETTLEMENTS');
+
+INSERT INTO LogSources (logSourceID, name) VALUES 
+(1, 'FRONTEND'),
+(2, 'SERVICES'),
+(4, 'DATABASE');
+
+-- =====================================================
 -- EXECUTE THE SALES GENERATION
 -- =====================================================
 

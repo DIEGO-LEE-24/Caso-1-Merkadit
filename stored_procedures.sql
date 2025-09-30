@@ -39,6 +39,7 @@ sp_main: BEGIN
     DECLARE v_currentUnitPrice DECIMAL(16,2);
     DECLARE v_totalProducts INT;
     DECLARE v_i INT DEFAULT 0;
+    DECLARE v_checksum VARBINARY(250);
     DECLARE v_error_occurred BOOLEAN DEFAULT FALSE;
     
     DECLARE CONTINUE HANDLER FOR SQLEXCEPTION 
@@ -171,18 +172,21 @@ sp_main: BEGIN
         totalAmount = p_totalAmount
     WHERE saleID = p_saleID;
     
+    -- Create checksum
+    SET v_checksum = SHA2(CONCAT('Sale registered successfully: ', v_invoiceNumber , p_computer , p_username , 
+    p_saleID , p_totalAmount , 1 , 1 , 4), 256);
     -- Log the transaction
     INSERT INTO Logs (
         description, computer, username, 
-        ref1ID, value1, logTypeID, logLevelID, logSourceID
+        ref1ID, value1, logTypeID, logLevelID, logSourceID, checksum
     )
     VALUES (
         CONCAT('Sale registered successfully: ', v_invoiceNumber),
         p_computer, p_username, p_saleID, p_totalAmount,
-        1, 4, 4
+        1, 4, 4, v_checksum
     );
     
-    SET p_result = CONCAT('Sale registered successfully. Invoice: ', v_invoiceNumber, 
+    SET p_result = CONCAT('Sale registered successfully', v_invoiceNumber, 
                          '. Total: ₡', FORMAT(p_totalAmount, 2));
     
     IF v_error_occurred = FALSE THEN
@@ -217,6 +221,7 @@ sp_settle: BEGIN
     DECLARE v_periodEnd DATE;
     DECLARE v_scheduleID INT;
     DECLARE v_userID INT DEFAULT 1;
+    DECLARE v_checksum VARBINARY(250);
     DECLARE v_error_occurred BOOLEAN DEFAULT FALSE;
     
     DECLARE CONTINUE HANDLER FOR SQLEXCEPTION 
@@ -301,18 +306,21 @@ sp_settle: BEGIN
     );
     
     SET p_settlementID = LAST_INSERT_ID();
-    
+    -- Calculate checksum
+    SET v_checksum = SHA2(CONCAT('Settlement created for commerce ', p_commerceID , ' - Period: ', 
+    DATE_FORMAT(v_periodStart, '%Y-%m-%d'), ' to ', DATE_FORMAT(v_periodEnd, '%Y-%m-%d'),  p_username, 
+    p_settlementID, v_contractID, v_totalSales , p_totalAmount , 2 , 1 , 4), 256);
     -- Log the settlement
     INSERT INTO Logs (
         description, username, ref1ID, ref2ID, 
-        value1, value2, logTypeID, logLevelID, logSourceID
+        value1, value2, logTypeID, logLevelID, logSourceID, checksum
     )
     VALUES (
         CONCAT('Settlement created for commerce ', p_commerceID, 
                ' - Period: ', DATE_FORMAT(v_periodStart, '%Y-%m-%d'), 
                ' to ', DATE_FORMAT(v_periodEnd, '%Y-%m-%d')),
         p_username, p_settlementID, v_contractID,
-        v_totalSales, p_totalAmount, 1, 4, 4
+        v_totalSales, p_totalAmount, 2, 1, 4, v_checksum
     );
     
     SET p_result = CONCAT('Settlement created successfully. ',
@@ -334,9 +342,7 @@ DELIMITER ;
 -- =====================================================
 
 /*
-
--- JSON to insert any amount of products to the sale.alter
-
+-- JSON to insert any amount of products to the sale.
 SET @v_products = '[
   { "productID": 1, "quantity": 2, "unitPrice": 1500.00 },
   { "productID": 3, "quantity": 1, "unitPrice": 5000.00 }
@@ -358,6 +364,7 @@ CALL SP_registerSale(
 );
 
 SELECT @saleID as SaleID, @totalAmount as TotalAmount, @result as Result;
+SELECT * FROM Logs;
 */
 
 /*
@@ -371,6 +378,8 @@ CALL SP_settleCommerce(
     @totalAmount,   -- p_totalAmount OUT
     @result         -- p_result OUT
 );
+SELECT @settlementID as SettlementID, @totalAmount as TotalAmount, @result as Result;
+SELECT * FROM Logs;
 
 -- Para probar venta
 CALL SP_registerSale(1, 1, 1, NULL, 0,  @v_products, 'POS-001', 'Juan', @saleID, @totalAmount, @result);
