@@ -39,7 +39,7 @@
 				],
 				"body": {
 					"mode": "raw",
-					"raw": "{\n  \"commerceID\": 1,\n  \"customerID\": 1,\n  \"paymentMethodID\": 1,\n  \"paymentReference\": null,\n  \"discountAmount\": 0,\n  \"products\": [\n    {\n      \"productID\": 1,\n      \"quantity\": 2,\n      \"unitPrice\": 1500.00\n    },\n    {\n      \"productID\": 3,\n      \"quantity\": 1,\n      \"unitPrice\": 5000.00\n    }\n  ],\n  \"cashierName\": \"Juan Perez\"\n}"
+					"raw": "{\n  \"commerceID\": 1,\n  \"customerID\": 1,\n  \"paymentMethodID\": 1,\n  \"paymentReference\": null,\n  \"discountAmount\": 0,\n  \"products\": [\n    { \"productID\": 1, \"quantity\": 2, \"unitPrice\": 1500.00 },\n    { \"productID\": 3, \"quantity\": 1, \"unitPrice\": 5000.00 }\n  ],\n  \"cashierName\": \"Juan Perez\"\n}"
 				},
 				"url": {
 					"raw": "http://localhost:3000/api/sales/register",
@@ -70,7 +70,7 @@
 				],
 				"body": {
 					"mode": "raw",
-					"raw": "{\n  \"commerceID\": 2,\n  \"customerID\": 2,\n  \"paymentMethodID\": 2,\n  \"paymentReference\": \"CARD-12345\",\n  \"discountAmount\": 500.00,\n  \"products\": [\n    {\n      \"productID\": 5,\n      \"quantity\": 3,\n      \"unitPrice\": 2000.00\n    }\n  ],\n  \"cashierName\": \"Maria Lopez\"\n}"
+					"raw": "{\n  \"commerceID\": 2,\n  \"customerID\": 2,\n  \"paymentMethodID\": 2,\n  \"paymentReference\": \"CARD-12345\",\n  \"discountAmount\": 500.00,\n  \"products\": [\n    { \"productID\": 5, \"quantity\": 3, \"unitPrice\": 2000.00 }\n  ],\n  \"cashierName\": \"Maria Lopez\"\n}"
 				},
 				"url": {
 					"raw": "http://localhost:3000/api/sales/register",

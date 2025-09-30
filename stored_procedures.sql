@@ -10,7 +10,8 @@ USE merkadit;
 
 DELIMITER //
 
-DROP PROCEDURE IF EXISTS SP_registerSale//
+DROP PROCEDURE IF EXISTS SP_registerSale
+//
 
 CREATE PROCEDURE SP_registerSale(
     IN p_commerceID INT,
@@ -18,15 +19,7 @@ CREATE PROCEDURE SP_registerSale(
     IN p_paymentMethodID TINYINT,
     IN p_paymentReference VARCHAR(100),
     IN p_discountAmount DECIMAL(16,2),
-    IN p_productID1 INT,
-    IN p_quantity1 INT,
-    IN p_unitPrice1 DECIMAL(16,2),
-    IN p_productID2 INT,
-    IN p_quantity2 INT,
-    IN p_unitPrice2 DECIMAL(16,2),
-    IN p_productID3 INT,
-    IN p_quantity3 INT,
-    IN p_unitPrice3 DECIMAL(16,2),
+    IN p_products JSON,
     IN p_computer VARCHAR(50),
     IN p_username VARCHAR(50),
     OUT p_saleID INT,
@@ -40,6 +33,12 @@ sp_main: BEGIN
     DECLARE v_stockAvailable INT;
     DECLARE v_lineSubtotal DECIMAL(16,2);
     DECLARE v_userID INT DEFAULT 3;
+    
+    DECLARE v_currentProductId INT;
+    DECLARE v_currentQuantity INT;
+    DECLARE v_currentUnitPrice DECIMAL(16,2);
+    DECLARE v_totalProducts INT;
+    DECLARE v_i INT DEFAULT 0;
     DECLARE v_error_occurred BOOLEAN DEFAULT FALSE;
     
     DECLARE CONTINUE HANDLER FOR SQLEXCEPTION 
@@ -60,7 +59,7 @@ sp_main: BEGIN
         LEAVE sp_main;
     END IF;
     
-    IF p_productID1 IS NULL OR p_productID1 <= 0 THEN
+    IF JSON_LENGTH(p_products) = 0 OR p_products IS NULL THEN
         SET p_result = 'Error: At least one product must be specified';
         LEAVE sp_main;
     END IF;
@@ -82,65 +81,35 @@ sp_main: BEGIN
     
     START TRANSACTION;
     
-    -- Check stock for product 1
-    IF p_productID1 IS NOT NULL AND p_quantity1 > 0 THEN
-        SELECT stockQuantity INTO v_stockAvailable
-        FROM Products 
-        WHERE productID = p_productID1 AND commerceID = p_commerceID AND isActive = 1;
-        
-        IF v_stockAvailable IS NULL THEN
-            SET p_result = CONCAT('Error: Product ', p_productID1, ' not found or inactive');
-            ROLLBACK;
-            LEAVE sp_main;
-        END IF;
-        
-        IF v_stockAvailable < p_quantity1 THEN
-            SET p_result = CONCAT('Error: Insufficient stock for product ', p_productID1, 
-                                '. Available: ', v_stockAvailable, ', Required: ', p_quantity1);
-            ROLLBACK;
-            LEAVE sp_main;
-        END IF;
-    END IF;
+    -- Check stock for all products
+    SET v_totalProducts = JSON_LENGTH(p_products);
     
-    -- Check stock for product 2 (if provided)
-    IF p_productID2 IS NOT NULL AND p_quantity2 > 0 THEN
-        SELECT stockQuantity INTO v_stockAvailable
-        FROM Products 
-        WHERE productID = p_productID2 AND commerceID = p_commerceID AND isActive = 1;
-        
-        IF v_stockAvailable IS NULL THEN
-            SET p_result = CONCAT('Error: Product ', p_productID2, ' not found or inactive');
-            ROLLBACK;
-            LEAVE sp_main;
-        END IF;
-        
-        IF v_stockAvailable < p_quantity2 THEN
-            SET p_result = CONCAT('Error: Insufficient stock for product ', p_productID2,
-                                '. Available: ', v_stockAvailable, ', Required: ', p_quantity2);
-            ROLLBACK;
-            LEAVE sp_main;
-        END IF;
-    END IF;
+    WHILE v_i < v_totalProducts DO
     
-    -- Check stock for product 3 (if provided)
-    IF p_productID3 IS NOT NULL AND p_quantity3 > 0 THEN
-        SELECT stockQuantity INTO v_stockAvailable
-        FROM Products 
-        WHERE productID = p_productID3 AND commerceID = p_commerceID AND isActive = 1;
-        
-        IF v_stockAvailable IS NULL THEN
-            SET p_result = CONCAT('Error: Product ', p_productID3, ' not found or inactive');
-            ROLLBACK;
-            LEAVE sp_main;
-        END IF;
-        
-        IF v_stockAvailable < p_quantity3 THEN
-            SET p_result = CONCAT('Error: Insufficient stock for product ', p_productID3,
-                                '. Available: ', v_stockAvailable, ', Required: ', p_quantity3);
-            ROLLBACK;
-            LEAVE sp_main;
-        END IF;
-    END IF;
+		SET v_currentProductId = CAST(JSON_UNQUOTE(JSON_EXTRACT(p_products, CONCAT('$[', v_i, '].productID'))) AS UNSIGNED);
+		SET v_currentQuantity = CAST(JSON_UNQUOTE(JSON_EXTRACT(p_products, CONCAT('$[', v_i, '].quantity'))) AS UNSIGNED);
+    
+        IF v_currentProductId IS NOT NULL AND v_currentQuantity > 0 THEN
+			SELECT stockQuantity INTO v_stockAvailable
+			FROM Products 
+			WHERE productID = v_currentProductId AND commerceID = p_commerceID AND isActive = 1;
+			
+			IF v_stockAvailable IS NULL THEN
+				SET p_result = CONCAT('Error: Product ', v_currentProductId, ' not found or inactive');
+				ROLLBACK;
+				LEAVE sp_main;
+			END IF;
+			
+			IF v_stockAvailable < v_currentQuantity THEN
+				SET p_result = CONCAT('Error: Insufficient stock for product ', v_currentProductId, 
+									'. Available: ', v_stockAvailable, ', Required: ', v_currentQuantity);
+				ROLLBACK;
+				LEAVE sp_main;
+			END IF;
+		END IF;
+    
+		SET v_i = v_i + 1;
+    END WHILE;
     
     -- Insert sale header
     INSERT INTO Sales (
@@ -158,71 +127,38 @@ sp_main: BEGIN
     
     SET p_saleID = LAST_INSERT_ID();
     
-    -- Process product 1
-    IF p_productID1 IS NOT NULL AND p_quantity1 > 0 THEN
-        SET v_lineSubtotal = p_unitPrice1 * p_quantity1;
-        SET v_subtotal = v_subtotal + v_lineSubtotal;
-        
-        INSERT INTO SaleDetails (saleID, productID, unitPrice, quantity, discountAmount, subtotal)
-        VALUES (p_saleID, p_productID1, p_unitPrice1, p_quantity1, 0, v_lineSubtotal);
-        
-        UPDATE Products 
-        SET stockQuantity = stockQuantity - p_quantity1
-        WHERE productID = p_productID1;
-        
-        INSERT INTO InventoryMovements (
-            productID, movementTypeID, stockQuantity,
-            referenceDescription, referenceID, movementDate, createdBy
-        )
-        VALUES (
-            p_productID1, 2, -p_quantity1,
-            CONCAT('Sale #', v_invoiceNumber), p_saleID, NOW(), p_username
-        );
-    END IF;
+    -- Process all products
     
-    -- Process product 2 (if provided)
-    IF p_productID2 IS NOT NULL AND p_quantity2 > 0 THEN
-        SET v_lineSubtotal = p_unitPrice2 * p_quantity2;
-        SET v_subtotal = v_subtotal + v_lineSubtotal;
-        
-        INSERT INTO SaleDetails (saleID, productID, unitPrice, quantity, discountAmount, subtotal)
-        VALUES (p_saleID, p_productID2, p_unitPrice2, p_quantity2, 0, v_lineSubtotal);
-        
-        UPDATE Products 
-        SET stockQuantity = stockQuantity - p_quantity2
-        WHERE productID = p_productID2;
-        
-        INSERT INTO InventoryMovements (
-            productID, movementTypeID, stockQuantity,
-            referenceDescription, referenceID, movementDate, createdBy
-        )
-        VALUES (
-            p_productID2, 2, -p_quantity2,
-            CONCAT('Sale #', v_invoiceNumber), p_saleID, NOW(), p_username
-        );
-    END IF;
+    SET v_i = 0;
+	WHILE v_i < v_totalProducts DO
     
-    -- Process product 3 (if provided)
-    IF p_productID3 IS NOT NULL AND p_quantity3 > 0 THEN
-        SET v_lineSubtotal = p_unitPrice3 * p_quantity3;
-        SET v_subtotal = v_subtotal + v_lineSubtotal;
-        
-        INSERT INTO SaleDetails (saleID, productID, unitPrice, quantity, discountAmount, subtotal)
-        VALUES (p_saleID, p_productID3, p_unitPrice3, p_quantity3, 0, v_lineSubtotal);
-        
-        UPDATE Products 
-        SET stockQuantity = stockQuantity - p_quantity3
-        WHERE productID = p_productID3;
-        
-        INSERT INTO InventoryMovements (
-            productID, movementTypeID, stockQuantity,
-            referenceDescription, referenceID, movementDate, createdBy
-        )
-        VALUES (
-            p_productID3, 2, -p_quantity3,
-            CONCAT('Sale #', v_invoiceNumber), p_saleID, NOW(), p_username
-        );
-    END IF;
+		SET v_currentProductId = CAST(JSON_UNQUOTE(JSON_EXTRACT(p_products, CONCAT('$[', v_i, '].productID'))) AS UNSIGNED);
+		SET v_currentQuantity = CAST(JSON_UNQUOTE(JSON_EXTRACT(p_products, CONCAT('$[', v_i, '].quantity'))) AS UNSIGNED);
+		SET v_currentUnitPrice = CAST(JSON_UNQUOTE(JSON_EXTRACT(p_products, CONCAT('$[', v_i, '].unitPrice'))) AS DECIMAL(16,2));
+    
+        IF v_currentProductId IS NOT NULL AND v_currentQuantity > 0 THEN
+			SET v_lineSubtotal = v_currentUnitPrice * v_currentQuantity;
+			SET v_subtotal = v_subtotal + v_lineSubtotal;
+			
+			INSERT INTO SaleDetails (saleID, productID, unitPrice, quantity, discountAmount, subtotal)
+			VALUES (p_saleID, v_currentProductId, v_currentUnitPrice, v_currentQuantity, 0, v_lineSubtotal);
+			
+			UPDATE Products 
+			SET stockQuantity = stockQuantity - v_currentQuantity
+			WHERE productID = v_currentProductId;
+			
+			INSERT INTO InventoryMovements (
+				productID, movementTypeID, stockQuantity,
+				referenceDescription, referenceID, movementDate, createdBy
+			)
+			VALUES (
+				v_currentProductId, 2, - v_currentQuantity,
+				CONCAT('Sale #', v_invoiceNumber), p_saleID, NOW(), p_username
+			);
+		END IF;
+    
+		SET v_i = v_i + 1;
+    END WHILE;
     
     -- Calculate totals
     SET v_taxAmount = v_subtotal * 0.13;
@@ -253,7 +189,8 @@ sp_main: BEGIN
         COMMIT;
     END IF;
     
-END//
+END
+//
 
 -- =====================================================
 -- SP_settleCommerce - Monthly settlement calculation
@@ -397,6 +334,14 @@ DELIMITER ;
 -- =====================================================
 
 /*
+
+-- JSON to insert any amount of products to the sale.alter
+
+SET @v_products = '[
+  { "productID": 1, "quantity": 2, "unitPrice": 1500.00 },
+  { "productID": 3, "quantity": 1, "unitPrice": 5000.00 }
+]';
+
 -- Test SP_registerSale
 CALL SP_registerSale(
     1,           -- p_commerceID (Restaurante El Sabor)
@@ -404,15 +349,7 @@ CALL SP_registerSale(
     1,           -- p_paymentMethodID (Efectivo)
     NULL,        -- p_paymentReference
     0,           -- p_discountAmount
-    1,           -- p_productID1 (Coca Cola)
-    2,           -- p_quantity1
-    1500.00,     -- p_unitPrice1
-    3,           -- p_productID2 (Casado con Pollo)
-    1,           -- p_quantity2
-    5000.00,     -- p_unitPrice2
-    NULL,        -- p_productID3
-    NULL,        -- p_quantity3
-    NULL,        -- p_unitPrice3
+    @v_products,           -- p_products 
     'POS-001',   -- p_computer
     'Juan',      -- p_username
     @saleID,     -- p_saleID OUT
@@ -434,8 +371,9 @@ CALL SP_settleCommerce(
     @totalAmount,   -- p_totalAmount OUT
     @result         -- p_result OUT
 );
+
 -- Para probar venta
-CALL SP_registerSale(1, 1, 1, NULL, 0, 1, 2, 1500.00, 3, 1, 5000.00, NULL, NULL, NULL, 'POS-001', 'Juan', @saleID, @totalAmount, @result);
+CALL SP_registerSale(1, 1, 1, NULL, 0,  @v_products, 'POS-001', 'Juan', @saleID, @totalAmount, @result);
 SELECT @saleID, @totalAmount, @result;
 
 -- Para probar liquidación  
