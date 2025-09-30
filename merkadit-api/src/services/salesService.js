@@ -22,19 +22,36 @@ class SalesService {
     }
 
     validateSaleData(saleData) {
-        const { commerceID, productID1, quantity1, unitPrice1 } = saleData;
+        const { commerceID, products} = saleData;
         
         if (!commerceID) {
             throw new Error('Commerce ID is required');
         }
         
-        if (!productID1 || !quantity1 || !unitPrice1) {
-            throw new Error('At least one product with quantity and price is required');
+        if (!products || !Array.isArray(products) || products.length === 0) {
+            throw new Error('At least one product is required');
         }
-        
-        if (quantity1 <= 0 || unitPrice1 <= 0) {
-            throw new Error('Quantity and price must be positive numbers');
+
+        let hasValidProduct = false;
+        for (const item of products) {
+            
+            const product = item.product || item;
+            
+            if (product.productID && product.quantity && product.unitPrice) {
+                if (product.quantity <= 0) {
+                    throw new Error('Quantity must be a positive number');
+                }
+                if (product.unitPrice <= 0) {
+                    throw new Error('Unit price must be a positive number');
+                }
+                hasValidProduct = true;
+            }
         }
+
+        if (!hasValidProduct) {
+            throw new Error('At least one product with productID, quantity and unitPrice is required');
+        }
+
         
         // Additional validations can be added here
     }
