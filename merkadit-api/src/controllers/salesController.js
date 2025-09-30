@@ -10,15 +10,7 @@ class SalesController {
                 paymentMethodID: req.body.paymentMethodID,
                 paymentReference: req.body.paymentReference,
                 discountAmount: req.body.discountAmount,
-                productID1: req.body.products?.[0]?.productID,
-                quantity1: req.body.products?.[0]?.quantity,
-                unitPrice1: req.body.products?.[0]?.unitPrice,
-                productID2: req.body.products?.[1]?.productID,
-                quantity2: req.body.products?.[1]?.quantity,
-                unitPrice2: req.body.products?.[1]?.unitPrice,
-                productID3: req.body.products?.[2]?.productID,
-                quantity3: req.body.products?.[2]?.quantity,
-                unitPrice3: req.body.products?.[2]?.unitPrice,
+ 		        products: req.body.products,
                 computer: req.body.computer || req.ip,
                 username: req.body.username || 'API_User'
             };
