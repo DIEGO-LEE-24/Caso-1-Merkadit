@@ -10,32 +10,24 @@ class SalesRepository {
             
             // Check if data comes as products array (expected format)
             if (saleData.products && Array.isArray(saleData.products)) {
-                products = saleData.products;
-            } 
-            // Check if data comes as individual fields (current issue)
-            else if (saleData.productID1) {
-                products = [];
-                if (saleData.productID1) {
-                    products.push({
-                        productID: saleData.productID1,
-                        quantity: saleData.quantity1,
-                        unitPrice: saleData.unitPrice1
-                    });
-                }
-                if (saleData.productID2) {
-                    products.push({
-                        productID: saleData.productID2,
-                        quantity: saleData.quantity2,
-                        unitPrice: saleData.unitPrice2
-                    });
-                }
-                if (saleData.productID3) {
-                    products.push({
-                        productID: saleData.productID3,
-                        quantity: saleData.quantity3,
-                        unitPrice: saleData.unitPrice3
-                    });
-                }
+                products = saleData.products.map(item => {
+                    // If the input looks like { "product": { "productID": 1, ... } }
+                    if (item.product && typeof item.product === 'object') {
+                        return {
+                            productID: item.product.productID,
+                            quantity: item.product.quantity,
+                            unitPrice: item.product.unitPrice
+                        };
+                    } 
+                    // If the input looks like { "productID": 1, ... }
+                    else {
+                        return {
+                            productID: item.productID,
+                            quantity: item.quantity,
+                            unitPrice: item.unitPrice
+                        };
+                    }
+                });
             }
 
             console.log('Processed products:', products);
@@ -55,34 +47,22 @@ class SalesRepository {
             } = saleData;
 
             // Preparar productos individuales (máximo 3)
-            const product1 = products[0] || {};
-            const product2 = products[1] || {};
-            const product3 = products[2] || {};
+            const productsJSON = JSON.stringify(products);
 
-            console.log('Product1:', product1);
-            console.log('Product2:', product2);
-            console.log('Product3:', product3);
+            console.log('Products JSON for SP:', productsJSON);
 
             // Llamar al stored procedure con parámetros separados
             const connection = await database.pool.getConnection();
             
             const [results] = await connection.execute(
-                'CALL SP_registerSale(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, @saleID, @totalAmount, @result)',
+                'CALL SP_registerSale(?, ?, ?, ?, ?, ?, ?, ?, @saleID, @totalAmount, @result)',
                 [
                     commerceID,
                     customerID || null,
                     paymentMethodID,
                     paymentReference || null,
                     discountAmount || 0,
-                    product1.productID || null,
-                    product1.quantity || null,
-                    product1.unitPrice || null,
-                    product2.productID || null,
-                    product2.quantity || null,
-                    product2.unitPrice || null,
-                    product3.productID || null,
-                    product3.quantity || null,
-                    product3.unitPrice || null,
+   		    productsJSON,
                     'POS-001',  // posID fijo
                     cashierName || saleData.username || 'API_User'
                 ]
