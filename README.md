@@ -8,7 +8,7 @@
 
 **Professor:** Rodrigo Núñez Núñez  
 **Course:** Base de Datos I  
-**Institution:** Universidad de Costa Rica  
+**Institution:** tecnologico de costa rica  
 
 ---
 
